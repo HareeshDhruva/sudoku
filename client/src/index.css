@@ -1,0 +1,57 @@
+.sudoku-container {
+  text-align: center;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #fff;
+  /* box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); */
+  border-radius: 10px;
+  width: 400px; /* Adjust the width of the container */
+}
+
+.room-input {
+  padding: 10px;
+  font-size: 16px;
+  margin: 10px;
+  width: 200px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+.join-button, .create-button, .check-button {
+  padding: 10px 20px;
+  font-size: 16px;
+  margin: 10px;
+  cursor: pointer;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+}
+
+.join-button:hover, .create-button:hover, .check-button:hover {
+  background-color: #45a049;
+}
+
+.sudoku-board {
+  display: inline-block;
+  margin-top: 20px;
+}
+
+.sudoku-row {
+  display: flex;
+  justify-content: center; /* Center the rows */
+}
+
+.sudoku-cell {
+  width: 40px;
+  height: 40px;
+  text-align: center;
+  font-size: 20px;
+  margin: 2px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+.sudoku-cell:disabled {
+  background-color: #f0f0f0;
+}
