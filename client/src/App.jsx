@@ -12,9 +12,25 @@ const SudokuGame = () => {
   const [duration, setDuration] = useState(300); // Default timer duration in seconds
   const [error, setError] = useState(''); // State for error messages
   const [createdRoom, setCreatedRoom] = useState(''); // Store created room number
+  const [k, setK] = useState(0); // State to check board initialization
 
+  // Initialize editable state for each cell
+  const [initialCheck, setInitialCheck] = useState(Array.from({ length: 9 }, () => Array(9).fill(false)));
+
+  // Function to generate a random room number
   const generateRandomRoomNumber = () => {
     return Math.floor(1000 + Math.random() * 9000).toString(); // Generate room number between 1000 and 9999
+  };
+
+  // Function to mark which cells are editable (not pre-filled)
+  const create = (board) => {
+    if (k === 0) {
+      setK(1); // Ensure it runs only once
+      const editable = board.map((row) =>
+        row.map((cell) => cell === '') // Mark empty cells (editable)
+      );
+      setInitialCheck(editable); // Store editable status
+    }
   };
 
   const createRoom = () => {
@@ -33,8 +49,31 @@ const SudokuGame = () => {
     }
   };
 
+  // Function to check if a number can be placed (basic Sudoku validation)
+  function check(row, col, num) {
+    if (num === '') return true; // Empty cell is always valid
+    if (num <= 0 || num > 9) return false;
+
+    for (let x = 0; x < 9; x++) {
+      if (board[row][x] === num.toString() || board[x][col] === num.toString()) return false;
+    }
+
+    let m = 3, n = 3;
+    let x = m * Math.floor(row / m);
+    let y = n * Math.floor(col / n);
+    for (let i = x; i < x + m; i++) {
+      for (let j = y; j < y + n; j++) {
+        if (board[i][j] === num.toString()) return false;
+      }
+    }
+    return true;
+  }
   const handleChange = (rowIndex, colIndex, value) => {
-    if (board[rowIndex][colIndex] === '' && /^[1-9]?$/.test(value)) {
+    if (!initialCheck[rowIndex][colIndex]) {
+      alert('This cell is fixed and cannot be changed.');
+      return;
+    }
+    if ((value === '' || (value >= 1 && value <= 9)) && check(rowIndex,colIndex,value)) {
       const newBoard = board.map((row, rIndex) => {
         if (rIndex === rowIndex) {
           return row.map((cell, cIndex) => (cIndex === colIndex ? value : cell));
@@ -44,26 +83,35 @@ const SudokuGame = () => {
       setBoard(newBoard);
       socket.emit('send_board', { room, board: newBoard });
     }
+    else{
+      alert("invalid")
+    }
   };
 
   useEffect(() => {
     socket.on('initial_board', (initialBoard) => {
       setBoard(initialBoard);
+      create(initialBoard);
     });
+
     socket.on('update_board', (newBoard) => {
       setBoard(newBoard);
     });
+
     socket.on('timer_update', (remainingTime) => {
       setTimer(remainingTime);
     });
+
     socket.on('game_over', ({ message }) => {
       alert(message); // Display game over message
       setJoined(false);
       setBoard([]); // Reset the board
     });
+
     socket.on('user_count_update', (count) => {
       setUsersCount(count);
     });
+
     socket.on('join_error', (message) => {
       setError(message); // Display error if room doesn't exist
     });
@@ -109,8 +157,8 @@ const SudokuGame = () => {
                     value={cell}
                     onChange={(e) => handleChange(rowIndex, colIndex, e.target.value)}
                     maxLength="1"
-                    className="sudoku-cell"
-                    disabled={cell !== ''}
+                    className={`sudoku-cell ${!initialCheck[rowIndex][colIndex] ? 'fixed-cell' : ''}`} // Add a class for fixed cells
+                    disabled={!initialCheck[rowIndex][colIndex]} // Disable input for fixed cells
                   />
                 ))}
               </div>

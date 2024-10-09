@@ -68,7 +68,6 @@ function solveSudoku(board) {
   return true;
 }
 
-
 const initialBoard = Array.from({ length: a }, () => Array(a).fill(''));
 
 function generateNewBoard() {
