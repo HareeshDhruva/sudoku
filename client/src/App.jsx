@@ -13,6 +13,9 @@ const SudokuGame = () => {
   const [error, setError] = useState(''); // State for error messages
   const [createdRoom, setCreatedRoom] = useState(''); // Store created room number
   const [k, setK] = useState(0); // State to check board initialization
+  const [name, setName] = useState("");
+  const [ready, setReady] = useState(true);
+  const [admin, setAdmin] = useState("");
 
   // Initialize editable state for each cell
   const [initialCheck, setInitialCheck] = useState(Array.from({ length: 9 }, () => Array(9).fill(false)));
@@ -33,25 +36,36 @@ const SudokuGame = () => {
     }
   };
 
+  const full_check = () => {
+    for (let i = 0; i < 9; i++) {
+      for (let j = 0; j < 9; j++) {
+        if (board[i][j] == '') {
+          alert("fill all feilds");
+          return;
+        }
+      }
+    }
+    socket.emit('submit', name, room);
+  }
+
   const createRoom = () => {
     const newRoom = generateRandomRoomNumber();
     setRoom(newRoom);
-    socket.emit('create_room', newRoom, duration); // Emit create_room event
+    socket.emit('create_room', newRoom, name, ready);
     setJoined(true);
-    setCreatedRoom(newRoom); // Store created room
+    setCreatedRoom(newRoom);
   };
 
   const joinRoom = () => {
     if (room) {
-      socket.emit('join_room', room, duration);
+      socket.emit('join_room', room);
       setJoined(true);
-      setCreatedRoom(''); // Clear created room when joining
+      setCreatedRoom('');
     }
   };
 
-  // Function to check if a number can be placed (basic Sudoku validation)
   function check(row, col, num) {
-    if (num === '') return true; // Empty cell is always valid
+    if (num === '') return true;
     if (num <= 0 || num > 9) return false;
 
     for (let x = 0; x < 9; x++) {
@@ -73,7 +87,7 @@ const SudokuGame = () => {
       alert('This cell is fixed and cannot be changed.');
       return;
     }
-    if ((value === '' || (value >= 1 && value <= 9)) && check(rowIndex,colIndex,value)) {
+    if ((value === '' || (value >= 1 && value <= 9)) && check(rowIndex, colIndex, value)) {
       const newBoard = board.map((row, rIndex) => {
         if (rIndex === rowIndex) {
           return row.map((cell, cIndex) => (cIndex === colIndex ? value : cell));
@@ -81,12 +95,15 @@ const SudokuGame = () => {
         return row;
       });
       setBoard(newBoard);
-      socket.emit('send_board', { room, board: newBoard });
     }
-    else{
+    else {
       alert("invalid")
     }
   };
+
+  const handleChangeReady = () => {
+    socket.emit('start_room', room, duration);
+  }
 
   useEffect(() => {
     socket.on('initial_board', (initialBoard) => {
@@ -102,10 +119,14 @@ const SudokuGame = () => {
       setTimer(remainingTime);
     });
 
+    socket.on('admin', (admin) => {
+      setAdmin(admin);
+    })
+
     socket.on('game_over', ({ message }) => {
-      alert(message); // Display game over message
+      alert(message);
       setJoined(false);
-      setBoard([]); // Reset the board
+      setBoard([]);
     });
 
     socket.on('user_count_update', (count) => {
@@ -113,8 +134,17 @@ const SudokuGame = () => {
     });
 
     socket.on('join_error', (message) => {
-      setError(message); // Display error if room doesn't exist
+      setError(message);
     });
+    socket.on('admin_started', (ready) => {
+      setReady(ready);
+    });
+
+    socket.on('start_room', ready);
+
+    socket.on('completed', (name) => {
+      console.log("compeleted by " + name);
+    })
 
     return () => {
       socket.off('initial_board');
@@ -123,8 +153,22 @@ const SudokuGame = () => {
       socket.off('game_over');
       socket.off('user_count_update');
       socket.off('join_error');
+      socket.off('admin_started');
+      socket.off('start_room');
     };
   }, [room]);
+
+  function togglePopup() {
+    var popup = document.getElementById('popup');
+    var overlay = document.getElementById('overlay');
+    if (popup.style.display === 'block') {
+      popup.style.display = 'none';
+      overlay.style.display = 'none';
+    } else {
+      popup.style.display = 'block';
+      overlay.style.display = 'block';
+    }
+  }
 
   return (
     <div className="sudoku-container">
@@ -133,12 +177,21 @@ const SudokuGame = () => {
       {!joined ? (
         <div>
           <input
-            type="text"
+            type="number"
             placeholder="Enter room number"
             value={room}
             onChange={(e) => setRoom(e.target.value)}
             className="room-input"
           />
+
+          <input
+            type="text"
+            placeholder="Enter user name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="room-input"
+          />
+
           <button onClick={joinRoom} className="join-button">Join Room</button>
           <button onClick={createRoom} className="create-button">Create Room</button>
         </div>
@@ -146,24 +199,41 @@ const SudokuGame = () => {
         <div>
           <h2>Room: {room}</h2>
           <p>Players in the room: {usersCount}</p>
+          <p>Players name: {name}</p>
           <p>Time left: {timer ? `${timer} seconds` : 'Waiting for players...'}</p>
-          <div className="sudoku-board">
-            {board.map((row, rowIndex) => (
-              <div className="sudoku-row" key={rowIndex}>
-                {row.map((cell, colIndex) => (
-                  <input
-                    key={colIndex}
-                    type="text"
-                    value={cell}
-                    onChange={(e) => handleChange(rowIndex, colIndex, e.target.value)}
-                    maxLength="1"
-                    className={`sudoku-cell ${!initialCheck[rowIndex][colIndex] ? 'fixed-cell' : ''}`} // Add a class for fixed cells
-                    disabled={!initialCheck[rowIndex][colIndex]} // Disable input for fixed cells
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
+          <p>admin : {admin}</p>
+          {
+            ready ?
+              (
+                name !== admin ?
+                  <button className="join-button" disabled> waiting</button>
+                  :
+                  <button onClick={handleChangeReady} className="join-button">ready</button>
+              )
+
+              : (
+                <div className="sudoku-board">
+                  {board.map((row, rowIndex) => (
+                    <div className="sudoku-row" key={rowIndex}>
+                      {row.map((cell, colIndex) => (
+                        <input
+                          key={colIndex}
+                          type="text"
+                          value={cell}
+                          onChange={(e) => handleChange(rowIndex, colIndex, e.target.value)}
+                          maxLength="1"
+                          className={`sudoku-cell ${!initialCheck[rowIndex][colIndex] ? 'fixed-cell' : ''}`}
+                          disabled={!initialCheck[rowIndex][colIndex]}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                    <button onClick={full_check}>
+                      submit
+                    </button>
+                </div>
+              )
+          }
         </div>
       )}
     </div>
