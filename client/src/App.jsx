@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import io from "socket.io-client";
 const socket = io("https://sudoku-pn4c.onrender.com");
-import 'react-toastify/dist/ReactToastify.css';
-import { ToastContainer, toast } from 'react-toastify';
+// const socket = io("http://localhost:8000");
+import "react-toastify/dist/ReactToastify.css";
+import { ToastContainer, toast } from "react-toastify";
 
 const SudokuGame = () => {
   const [room, setRoom] = useState("");
@@ -20,11 +21,11 @@ const SudokuGame = () => {
   const [winner, setWinner] = useState("");
   const [solution, setSolution] = useState();
   const [viewSolution, setViewSolution] = useState(false);
-  const duration = 300;
-  
+  const [level, setLevel] = useState("easy");
   const [initialCheck, setInitialCheck] = useState(
     Array.from({ length: 9 }, () => Array(9).fill(false))
   );
+  const duration = 300;
   const generateRandomRoomNumber = () => {
     return Math.floor(1000 + Math.random() * 9000).toString();
   };
@@ -34,11 +35,10 @@ const SudokuGame = () => {
     setInitialCheck(editable);
   };
 
-
   const fullCheck = () => {
     const hasEmptyCells = board.some((row) => row.some((cell) => cell === ""));
     if (hasEmptyCells) {
-      toast.error('Please fill all the fields before submitting.',{
+      toast.error("Please fill all the fields before submitting.", {
         position: "bottom-center",
         autoClose: 1000,
         hideProgressBar: false,
@@ -56,7 +56,7 @@ const SudokuGame = () => {
   const createRoom = () => {
     const newRoom = generateRandomRoomNumber();
     setRoom(newRoom);
-    socket.emit("create_room", newRoom, name, ready);
+    socket.emit("create_room", newRoom, name, ready, level);
     setJoined(true);
     setCreatedRoom(newRoom);
   };
@@ -66,9 +66,8 @@ const SudokuGame = () => {
       socket.emit("join_room", room);
       setJoined(true);
       setCreatedRoom("");
-    }
-    else{
-      toast.error('Enter room id',{
+    } else {
+      toast.error("Enter room id", {
         position: "bottom-center",
         autoClose: 1000,
         hideProgressBar: false,
@@ -107,7 +106,7 @@ const SudokuGame = () => {
 
   const handleChange = (rowIndex, colIndex, value) => {
     if (!initialCheck[rowIndex][colIndex]) {
-      toast.error('This cell is fixed and cannot be changed.',{
+      toast.error("This cell is fixed and cannot be changed.", {
         position: "bottom-center",
         autoClose: 1000,
         hideProgressBar: false,
@@ -127,7 +126,7 @@ const SudokuGame = () => {
       );
       setBoard(newBoard);
     } else {
-      toast.success("invalid input",{
+      toast.success("invalid input", {
         position: "bottom-center",
         autoClose: 1000,
         hideProgressBar: false,
@@ -171,7 +170,7 @@ const SudokuGame = () => {
     socket.on("timer_update", (remainingTime) => setTimer(remainingTime));
     socket.on("admin", (admin) => setAdmin(admin));
     socket.on("game_over", ({ message }) => {
-      toast.success(message,{
+      toast.success(message, {
         position: "bottom-center",
         autoClose: 1000,
         hideProgressBar: false,
@@ -185,8 +184,8 @@ const SudokuGame = () => {
       setBoard([]);
     });
     socket.on("user_count_update", (count) => setUsersCount(count));
-    socket.on("join_error", (message) =>{
-      toast.error(message,{
+    socket.on("join_error", (message) => {
+      toast.error(message, {
         position: "bottom-center",
         autoClose: 1000,
         hideProgressBar: false,
@@ -255,6 +254,9 @@ const SudokuGame = () => {
     </div>
   );
 
+  const handleChangeLevel = (e) => {
+    setLevel(e.target.value);
+  };
   return (
     <div className="sudoku-container">
       {error && <p style={{ color: "red" }}>{error}</p>}
@@ -268,7 +270,21 @@ const SudokuGame = () => {
             onChange={(e) => setName(e.target.value)}
             className="room-input"
           />
-
+          <select
+            value={level}
+            onChange={handleChangeLevel}
+            className="room-input"
+          >
+            <option name="easy" value="easy" id="">
+              Easy
+            </option>
+            <option name="medium" value="medium" id="">
+              Medium
+            </option>
+            <option name="hard" value="hard" id="">
+              Hard
+            </option>
+          </select>
           {join === true ? (
             <>
               <input
@@ -339,8 +355,7 @@ const SudokuGame = () => {
               ))}
               <button
                 onClick={() => {
-                  fullCheck() &&
-                  togglePopup()
+                  fullCheck() && togglePopup();
                 }}
                 className="create-button"
               >
@@ -351,7 +366,7 @@ const SudokuGame = () => {
           )}
         </div>
       )}
-         <ToastContainer />
+      <ToastContainer />
     </div>
   );
 };
