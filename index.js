@@ -1,7 +1,9 @@
 const express = require('express');
+const config = require('dotenv')
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -12,11 +14,19 @@ const io = new Server(server, {
   },
 });
 
-const a = 9; // Size of the Sudoku board (9x9)
+config.config();
+
+const a = 9;
 app.use(express.json());
 app.use(cors());
 
-// Sudoku-related helper functions
+app.use(express.static(path.join(__dirname,"/client/dist")))
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "client", "dist", "index.html"));
+});
+
+
 function isValid(board, row, col, num) {
   if (num === '') return true;
   num = parseInt(num);
@@ -28,11 +38,10 @@ function isValid(board, row, col, num) {
     }
   }
 
-  let m = 3, n = 3;
-  let x = m * Math.floor(row / m);
-  let y = n * Math.floor(col / n);
-  for (let i = x; i < x + m; i++) {
-    for (let j = y; j < y + n; j++) {
+  const boxStartRow = Math.floor(row / 3) * 3;
+  const boxStartCol = Math.floor(col / 3) * 3;
+  for (let i = boxStartRow; i < boxStartRow + 3; i++) {
+    for (let j = boxStartCol; j < boxStartCol + 3; j++) {
       if (board[i][j] === num.toString()) return false;
     }
   }
@@ -51,8 +60,8 @@ function solveSudoku(board) {
   for (let i = 0; i < a; i++) {
     for (let j = 0; j < a; j++) {
       if (board[i][j] === '') {
-        let m = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-        for (let num of m) {
+        const m = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        for (const num of m) {
           if (isValid(board, i, j, num)) {
             board[i][j] = num.toString();
             if (solveSudoku(board)) {
@@ -69,52 +78,44 @@ function solveSudoku(board) {
 }
 
 const initialBoard = Array.from({ length: a }, () => Array(a).fill(''));
+let solution = [];
 
 function generateNewBoard() {
   solveSudoku(initialBoard);
-  // for (let i = 0; i < 60; i++) {
-  //   let r = Math.floor(Math.random() * a);
-  //   let c = Math.floor(Math.random() * a);
-  //   initialBoard[r][c] = '';
-  // }
-  
+  solution = JSON.parse(JSON.stringify(initialBoard));
+
+  for (let i = 0; i < 60; i++) {
+    const r = Math.floor(Math.random() * a);
+    const c = Math.floor(Math.random() * a);
+    initialBoard[r][c] = '';
+  }
+
   return initialBoard;
 }
 
-
-// Rooms object to store information about rooms
-
 const rooms = {};
-
-app.get("/", (req, res) => {
-  res.send('Welcome to the Sudoku Solver API!');
-});
 
 
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
-  socket.on('create_room', (room,name,ready) => {
+  socket.on('create_room', (room, name, ready) => {
     if (!rooms[room]) {
       const newBoard = generateNewBoard();
-      rooms[room] = { boards: [newBoard], users: [], timer: null, interval: null, admin:name, state:ready};
+      rooms[room] = { boards: [newBoard], users: [], timer: null, interval: null, admin: name, state: ready, win: false };
     }
     socket.join(room);
-    console.log(`User ${socket.id} created and joined room: ${room}`);
     rooms[room].users.push(socket.id);
     io.to(room).emit('user_count_update', rooms[room].users.length);
-    socket.emit('admin',rooms[room].admin);
+    socket.emit('admin', rooms[room].admin);
     socket.emit('initial_board', rooms[room].boards[0]);
   });
 
-  socket.on('start_room',(room,duration)=>{
-    rooms[room].state = !rooms[room].state
+  socket.on('start_room', (room, duration) => {
+    rooms[room].state = !rooms[room].state;
     io.to(room).emit('admin_started', rooms[room].state);
-    console.log(rooms[room].state);
-    if (rooms[room].state === false) {
+    if (!rooms[room].state) {
       startTimer(room, duration);
     }
-    console.log(rooms[room].state)
-  })
+  });
 
   socket.on('join_room', (room) => {
     if (!rooms[room]) {
@@ -122,9 +123,8 @@ io.on('connection', (socket) => {
       return;
     }
     socket.join(room);
-    console.log(`User ${socket.id} joined room: ${room}`);
     rooms[room].users.push(socket.id);
-    socket.emit('admin',rooms[room].admin);
+    socket.emit('admin', rooms[room].admin);
     io.to(room).emit('user_count_update', rooms[room].users.length);
     socket.emit('initial_board', rooms[room].boards[0]);
   });
@@ -136,10 +136,25 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('submit',(name,room)=>{
-    console.log("completed by " + name);
-    io.to(room).emit('completed', name);
-  })
+  socket.on('submit', (name, room) => {
+    rooms[room].win = !rooms[room].win;
+    io.to(room).emit('winner', name, rooms[room].win, solution);
+  });
+
+  socket.on('leave_room', (room) => {
+    if (rooms[room]) {
+      const index = rooms[room].users.indexOf(socket.id);
+      if (index !== -1) {
+        rooms[room].users.splice(index, 1);
+        io.to(room).emit('user_count_update', rooms[room].users.length);
+        if (rooms[room].users.length < 2 && rooms[room].interval) {
+          clearInterval(rooms[room].interval);
+          rooms[room].timer = null;
+        }
+        socket.leave(room);
+      }
+    }
+  });
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
@@ -160,20 +175,18 @@ io.on('connection', (socket) => {
 function startTimer(room, duration) {
   if (rooms[room]) {
     rooms[room].timer = duration;
-    const interval = setInterval(() => {
+    rooms[room].interval = setInterval(() => {
       rooms[room].timer -= 1;
       io.to(room).emit('timer_update', rooms[room].timer);
       if (rooms[room].timer <= 0) {
-        clearInterval(interval);
+        clearInterval(rooms[room].interval);
         io.to(room).emit('game_over', { winner: null, message: 'Time is up!' });
       }
     }, 1000);
-    rooms[room].interval = interval;
   }
 }
 
-const PORT = 8000;
-
+const PORT = process.env.PORT;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running`);
 });
