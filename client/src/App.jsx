@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import io from "socket.io-client";
 const socket = io("https://sudoku-pn4c.onrender.com");
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer, toast } from 'react-toastify';
 
 const SudokuGame = () => {
   const [room, setRoom] = useState("");
@@ -36,7 +38,16 @@ const SudokuGame = () => {
   const fullCheck = () => {
     const hasEmptyCells = board.some((row) => row.some((cell) => cell === ""));
     if (hasEmptyCells) {
-      alert("Please fill all the fields before submitting.");
+      toast.error('Please fill all the fields before submitting.',{
+        position: "bottom-center",
+        autoClose: 1000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "colored",
+      });
       return;
     }
     socket.emit("submit", name, room);
@@ -55,6 +66,18 @@ const SudokuGame = () => {
       socket.emit("join_room", room);
       setJoined(true);
       setCreatedRoom("");
+    }
+    else{
+      toast.error('Enter room id',{
+        position: "bottom-center",
+        autoClose: 1000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "colored",
+      });
     }
   };
 
@@ -84,7 +107,16 @@ const SudokuGame = () => {
 
   const handleChange = (rowIndex, colIndex, value) => {
     if (!initialCheck[rowIndex][colIndex]) {
-      alert("This cell is fixed and cannot be changed.");
+      toast.error('This cell is fixed and cannot be changed.',{
+        position: "bottom-center",
+        autoClose: 1000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "colored",
+      });
       return;
     }
     if (isValidInput(rowIndex, colIndex, value)) {
@@ -95,7 +127,16 @@ const SudokuGame = () => {
       );
       setBoard(newBoard);
     } else {
-      alert("Invalid input");
+      toast.success("invalid input",{
+        position: "bottom-center",
+        autoClose: 1000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "colored",
+      });
     }
   };
 
@@ -104,6 +145,22 @@ const SudokuGame = () => {
   };
 
   const togglePopup = () => setIsOpen(!isOpen);
+
+  const handleCloseRoom = () => {
+    socket.emit("leave_room");
+    setJoined(false);
+    setRoom("");
+    setBoard([]);
+    setError("");
+    setUsersCount(0);
+    setTimer(null);
+    setWinner("");
+    setSolution();
+    setViewSolution(false);
+    setAdmin("");
+    setIsOpen(false);
+    setName("");
+  };
 
   useEffect(() => {
     socket.on("initial_board", (initialBoard) => {
@@ -114,15 +171,35 @@ const SudokuGame = () => {
     socket.on("timer_update", (remainingTime) => setTimer(remainingTime));
     socket.on("admin", (admin) => setAdmin(admin));
     socket.on("game_over", ({ message }) => {
-      alert(message);
+      toast.success(message,{
+        position: "bottom-center",
+        autoClose: 1000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "colored",
+      });
       setJoined(false);
       setBoard([]);
     });
     socket.on("user_count_update", (count) => setUsersCount(count));
-    socket.on("join_error", (message) => setError(message));
+    socket.on("join_error", (message) =>{
+      toast.error(message,{
+        position: "bottom-center",
+        autoClose: 1000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "colored",
+      });
+      handleCloseRoom();
+    });
     socket.on("admin_started", (ready) => setReady(ready));
     socket.on("winner", (name, isWin, solution) => {
-
       setWinner(name);
       setIsOpen(isWin);
       setSolution(solution);
@@ -141,22 +218,6 @@ const SudokuGame = () => {
 
   const handleViewSolution = () => {
     setViewSolution((prev) => !prev);
-  };
-
-  const handleCloseRoom = () => {
-    socket.emit("leave_room");
-    setJoined(false);
-    setRoom("");
-    setBoard([]);
-    setError("");
-    setUsersCount(0);
-    setTimer(null);
-    setWinner("");
-    setSolution();
-    setViewSolution(false);
-    setAdmin("");
-    setIsOpen(false);
-    setName("");
   };
 
   const Popup = ({ closePopup }) => (
@@ -290,6 +351,7 @@ const SudokuGame = () => {
           )}
         </div>
       )}
+         <ToastContainer />
     </div>
   );
 };
