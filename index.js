@@ -84,7 +84,7 @@ function generateNewBoard() {
   solveSudoku(initialBoard);
   solution = JSON.parse(JSON.stringify(initialBoard));
 
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 50; i++) {
     const r = Math.floor(Math.random() * a);
     const c = Math.floor(Math.random() * a);
     initialBoard[r][c] = '';
@@ -157,7 +157,6 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
     for (const room in rooms) {
       const index = rooms[room].users.indexOf(socket.id);
       if (index !== -1) {
